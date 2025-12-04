@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram News CMS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.0/crypto-js.min.js"></script>
+</head>
+<body class="bg-black text-white">
+    <div id="app"></div>
+    
+    <script>
+        // Configuracion - NO GUARDES LA CONTRASEñA AQUI, solo el hash
+        const PASSWORD_HASH = 'f1d572d9f5e38e05c40d8b1e63edbd0c'; // hash de 'admin123' en MD5
+        
+        // Posts de ejemplo
+        let posts = JSON.parse(localStorage.getItem('posts') || '[]');
+        let isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        let loginAttempts = parseInt(localStorage.getItem('loginAttempts') || '0');
+        let blockedUntil = parseInt(localStorage.getItem('blockedUntil') || '0');
+        
+        function hashPassword(pwd) {
+            return CryptoJS.MD5(pwd).toString();
+        }
+        
+        function checkBlocked() {
+            if (Date.now() < blockedUntil) {
+                const minutesLeft = Math.ceil((blockedUntil - Date.now()) / 60000);
+                alert(`Acceso bloqueado. Inténtalo en ${minutesLeft} minutos.`);
+                return true;
+            }
+            return false;
+        }
+        
+        function login(password) {
+            if (checkBlocked()) return false;
+            
+            if (hashPassword(password) === PASSWORD_HASH) {
+                isLoggedIn = true;
+                loginAttempts = 0;
+                localStorage.setItem('isLoggedIn', 'true');
+                localStorage.setItem('loginAttempts', '0');
+                render();
+                return true;
+            }
+            
+            loginAttempts++;
+            if (loginAttempts >= 3) {
+                blockedUntil = Date.now() + (30 * 24 * 60 * 60 * 1000);
+                localStorage.setItem('blockedUntil', blockedUntil);
+                alert('Acceso bloqueado por 30 días.');
+            }
+            localStorage.setItem('loginAttempts', loginAttempts);
+            return false;
+        }
+        
+        function logout() {
+            isLoggedIn = false;
+            localStorage.setItem('isLoggedIn', 'false');
+            render();
+        }
+        
+        function addPost(title, excerpt, content, image) {
+            const post = {
+                id: Date.now(),
+                title,
+                excerpt,
+                content,
+                image,
+                date: new Date().toLocaleDateString('es-ES'),
+                timestamp: Date.now()
+            };
+            posts.unshift(post);
+            localStorage.setItem('posts', JSON.stringify(posts));
+            render();
+        }
+        
+        function deletePost(id) {
+            posts = posts.filter(p => p.id !== id);
+            localStorage.setItem('posts', JSON.stringify(posts));
+            render();
+        }
+        
+        function sharePost(post) {
+            const url = window.location.href;
+            const text = `${post.title} - ${post.excerpt}`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: post.title,
+                    text: text,
+                    url: url
+                });
+            } else {
+                const whatsapp = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
+                window.open(whatsapp, '_blank');
+            }
+        }
+        
+        function renderLogin() {
+            return `
+                <div class="min-h-screen bg-black flex items-center justify-center">
+                    <div class="bg-instagram-gray p-8 rounded-lg max-w-sm w-full">
+                        <h1 class="text-3xl font-bold mb-6 text-center">Instagram News</h1>
+                        <div class="space-y-4">
+                            <input type="password" id="password" placeholder="Contraseña" class="w-full bg-instagram-light-gray p-3 rounded text-white border border-instagram-border">
+                            <button onclick="handleLogin()" class="w-full bg-blue-600 p-3 rounded font-bold">Ingresar</button>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    function handleLogin() {
+                        const pwd = document.getElementById('password').value;
+                        if (!login(pwd)) alert('Contraseña incorrecta');
+                    }
+                    document.getElementById('password').addEventListener('keypress', e => {
+                        if (e.key === 'Enter') handleLogin();
+                    });
+                </script>
+            `;
+        }
+        
+        function renderFeed() {
+            return `
+                <div class="min-h-screen bg-black">
+                    <div class="max-w-2xl mx-auto">
+                        <div class="sticky top-0 bg-black border-b border-instagram-border p-4 flex justify-between items-center">
+                            <h1 class="text-xl font-bold">Feed</h1>
+                            <button onclick="logout()" class="text-red-500">Salir</button>
+                        </div>
+                        <div class="divide-y divide-instagram-border">
+                            ${posts.map(post => `
+                                <div class="p-4 cursor-pointer hover:bg-instagram-gray" onclick="openPostDetail(${post.id})">
+                                    ${post.image ? `<img src="${post.image}" class="w-full rounded mb-4 object-cover" style="max-height: 400px;">` : ''}
+                                    <h2 class="text-lg font-bold">${post.title}</h2>
+                                    <p class="text-gray-400 text-sm">${post.date}</p>
+                                    <p class="mt-2 text-gray-300">${post.excerpt}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <button onclick="document.getElementById('createModal').style.display='flex'" class="fixed bottom-6 right-6 bg-blue-600 rounded-full p-4 text-white text-2xl">+</button>
+                </div>
+            `;
+        }
+        
+        function renderAdmin() {
+            return `
+                <div class="min-h-screen bg-black max-w-2xl mx-auto p-4">
+                    <div class="flex justify-between items-center mb-6">
+                        <h1 class="text-2xl font-bold">CMS Admin</h1>
+                        <button onclick="logout()" class="text-red-500">Salir</button>
+                    </div>
+                    <div class="space-y-4">
+                        <input type="text" id="newTitle" placeholder="Título" class="w-full bg-instagram-light-gray p-3 rounded text-white border border-instagram-border">
+                        <textarea id="newExcerpt" placeholder="Descripción corta" rows="2" class="w-full bg-instagram-light-gray p-3 rounded text-white border border-instagram-border"></textarea>
+                        <textarea id="newContent" placeholder="Contenido" rows="4" class="w-full bg-instagram-light-gray p-3 rounded text-white border border-instagram-border"></textarea>
+                        <input type="url" id="newImage" placeholder="URL de imagen (opcional)" class="w-full bg-instagram-light-gray p-3 rounded text-white border border-instagram-border">
+                        <button onclick="handleAddPost()" class="w-full bg-green-600 p-3 rounded font-bold">Publicar</button>
+                    </div>
+                    <div class="mt-8">
+                        <h2 class="text-xl font-bold mb-4">Posts Publicados</h2>
+                        <div class="space-y-2">
+                            ${posts.map(post => `
+                                <div class="bg-instagram-gray p-4 rounded flex justify-between items-center">
+                                    <div>
+                                        <p class="font-bold">${post.title}</p>
+                                        <p class="text-sm text-gray-400">${post.date}</p>
+                                    </div>
+                                    <button onclick="deletePost(${post.id})" class="text-red-500">Eliminar</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    function handleAddPost() {
+                        const title = document.getElementById('newTitle').value;
+                        const excerpt = document.getElementById('newExcerpt').value;
+                        const content = document.getElementById('newContent').value;
+                        const image = document.getElementById('newImage').value;
+                        
+                        if (!title || !excerpt || !content) {
+                            alert('Completa todos los campos');
+                            return;
+                        }
+                        
+                        addPost(title, excerpt, content, image);
+                        document.getElementById('newTitle').value = '';
+                        document.getElementById('newExcerpt').value = '';
+                        document.getElementById('newContent').value = '';
+                        document.getElementById('newImage').value = '';
+                    }
+                </script>
+            `;
+        }
+        
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (isLoggedIn) {
+                app.innerHTML = renderAdmin();
+            } else {
+                app.innerHTML = renderLogin();
+            }
+        }
+        
+        render();
+    </script>
+</body>
+</html>
