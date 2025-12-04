@@ -27,6 +27,5 @@
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
     "@types/markdown-it": "^14.1.1",
-    "@types/gray-matter": "^4.1.2"
   }
 }
