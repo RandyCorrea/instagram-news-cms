@@ -1,270 +1,272 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram News CMS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.0/crypto-js.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instagram News CMS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.0/crypto-js.min.js"></script>
 </head>
 <body class="bg-white text-gray-900">
-    <div id="app"></div>
+  <div id="app"></div>
+
+  <script>
+    // Configuracion - NO GUARDES LA CONTRASENA AQUI, solo el hash
+    const PASSWORD_HASH = 'f1d572d9f5e38e05c40d8b1e63edbd0c'; // hash de 'admin123' en MD5
     
-    <script>
-        // Configuracion - NO GUARDES LA CONTRASENA AQUI, solo el hash
-        const PASSWORD_HASH = 'f1d572d9f5e38e05c40d8b1e63edbd0c'; // hash de 'admin123' en MD5
-        
-        let posts = JSON.parse(localStorage.getItem('posts') || '[]');
-        let isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
-        let currentView = 'feed'; // 'feed', 'post', 'admin', 'login'
-        let selectedPost = null;
-        let loginAttempts = parseInt(localStorage.getItem('loginAttempts') || '0');
-        let blockedUntil = parseInt(localStorage.getItem('blockedUntil') || '0');
-        
-        function hashPassword(pwd) {
-            return CryptoJS.MD5(pwd).toString();
-        }
-        
-        function checkBlocked() {
-            if (Date.now() < blockedUntil) {
-                const minutesLeft = Math.ceil((blockedUntil - Date.now()) / 60000);
-                alert(`Acceso bloqueado. Inténtalo en ${minutesLeft} minutos.`);
-                return true;
-            }
-            return false;
-        }
-        
-        function login(password) {
-            if (checkBlocked()) return false;
-            if (hashPassword(password) === PASSWORD_HASH) {
-                isLoggedIn = true;
-                loginAttempts = 0;
-                localStorage.setItem('isLoggedIn', 'true');
-                localStorage.setItem('loginAttempts', '0');
-                currentView = 'feed';
-                render();
-                return true;
-            }
-            loginAttempts++;
-            if (loginAttempts >= 3) {
-                blockedUntil = Date.now() + (30 * 24 * 60 * 60 * 1000);
-                localStorage.setItem('blockedUntil', blockedUntil);
-                alert('Acceso bloqueado por 30 días.');
-            }
-            localStorage.setItem('loginAttempts', loginAttempts);
-            return false;
-        }
-        
-        function logout() {
-            isLoggedIn = false;
-            currentView = 'login';
-            localStorage.setItem('isLoggedIn', 'false');
-            render();
-        }
-        
-        function addPost(title, excerpt, content, image) {
-            const post = {
-                id: Date.now(),
-                title, excerpt, content, image,
-                date: new Date().toLocaleDateString('es-ES'),
-                timestamp: Date.now(),
-                author: 'AdminUser',
-                likes: 0
-            };
-            posts.unshift(post);
-            localStorage.setItem('posts', JSON.stringify(posts));
-            alert('Post publicado!');
-            currentView = 'feed';
-            render();
-        }
-        
-        function deletePost(id) {
-            posts = posts.filter(p => p.id !== id);
-            localStorage.setItem('posts', JSON.stringify(posts));
-            render();
-        }
-        
-        function toggleLike(id) {
-            const post = posts.find(p => p.id === id);
-            if (post) {
-                post.likes = (post.likes || 0) === 0 ? 1 : 0;
-                localStorage.setItem('posts', JSON.stringify(posts));
-                render();
-            }
-        }
-        
-        function sharePost(post) {
-            const url = window.location.href;
-            const text = `${post.title} - ${post.excerpt}`;
-            if (navigator.share) {
-                navigator.share({ title: post.title, text: text, url: url });
-            } else {
-                alert('Compartir: ' + text);
-            }
-        }
-        
-        function renderLogin() {
-            return `
-                <div class="min-h-screen bg-white flex items-center justify-center px-4">
-                    <div class="max-w-sm w-full">
-                        <h1 class="text-3xl font-bold mb-6 text-center italic">InstaNews</h1>
-                        <div class="space-y-4">
-                            <input type="password" id="password" placeholder="Contraseña" class="w-full bg-gray-100 p-3 rounded border border-gray-300">
-                            <button onclick="handleLogin()" class="w-full bg-blue-500 text-white p-3 rounded font-bold">Ingresar</button>
-                        </div>
-                    </div>
-                </div>
-                <script>
-                    function handleLogin() {
-                        const pwd = document.getElementById('password').value;
-                        if (!login(pwd)) alert('Contraseña incorrecta');
-                    }
-                </script>
-            `;
-        }
-        
-        function renderHeader() {
-            return `
-                <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center">
-                    <h1 class="text-lg font-bold italic">InstaNews</h1>
-                    <button onclick="currentView = 'admin'; render()" class="text-gray-600">⚙️</button>
-                </div>
-            `;
-        }
-        
-        function renderFeed() {
-            return `
-                ${renderHeader()}
-                <div class="max-w-2xl mx-auto pb-20">
-                    ${posts.map(post => `
-                        <div class="border-b border-gray-200 px-4 py-4 cursor-pointer hover:bg-gray-50" onclick="selectedPost = ${post.id}; currentView = 'post'; render()">
-                            <div class="flex items-center mb-3">
-                                <div class="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-yellow-500 mr-2"></div>
-                                <div>
-                                    <p class="font-bold text-sm">${post.author}</p>
-                                </div>
-                            </div>
-                            ${post.image ? `<img src="${post.image}" class="w-full rounded mb-3 object-cover" style="max-height: 400px;">` : ''}
-                            <div class="flex space-x-4 mb-3 text-xl">
-                                <button onclick="event.stopPropagation(); toggleLike(${post.id})" class="${post.likes ? 'text-red-500' : 'text-gray-600'}">❤️</button>
-                                <button onclick="event.stopPropagation(); sharePost(${JSON.stringify(post).replace(/"/g, '&quot;')})" class="text-gray-600">✈️</button>
-                                <button class="text-gray-600 ml-auto">🔖</button>
-                            </div>
-                            <p class="text-xs text-gray-500 mb-2">${post.likes || 0} Me gusta</p>
-                            <h2 class="font-bold">${post.title}</h2>
-                            <p class="text-sm text-gray-600">${post.excerpt}</p>
-                            <p class="text-xs text-gray-400 mt-2">HACE 2 HORAS</p>
-                        </div>
-                    `).join('')}
-                </div>
-                <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 max-w-2xl mx-auto flex justify-around py-3">
-                    <button onclick="currentView = 'feed'; render()" class="text-2xl">🏠</button>
-                    <button class="text-2xl text-gray-400">❤️</button>
-                    <button class="text-2xl text-gray-400">➕</button>
-                    <button onclick="currentView = 'admin'; render()" class="text-2xl">👤</button>
-                </div>
-            `;
-        }
-        
-        function renderPostDetail() {
-            const post = posts.find(p => p.id === selectedPost);
-            if (!post) return renderFeed();
-            
-            return `
-                ${renderHeader()}
-                <div class="max-w-2xl mx-auto pb-20 px-4">
-                    <button onclick="currentView = 'feed'; render()" class="text-blue-500 mb-4">← Volver</button>
-                    
-                    <div class="flex items-center mb-4">
-                        <div class="w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-yellow-500 mr-3"></div>
-                        <div>
-                            <p class="font-bold">${post.author}</p>
-                            <p class="text-xs text-gray-500">HACE 2 HORAS</p>
-                        </div>
-                    </div>
-                    
-                    ${post.image ? `<img src="${post.image}" class="w-full rounded mb-4 object-cover">` : ''}
-                    
-                    <div class="flex space-x-4 mb-4 text-xl">
-                        <button onclick="event.stopPropagation(); toggleLike(${post.id})" class="${post.likes ? 'text-red-500' : 'text-gray-600'}">❤️</button>
-                        <button onclick="sharePost(${JSON.stringify(post).replace(/"/g, '&quot;')})" class="text-gray-600">✈️</button>
-                        <button class="text-gray-600 ml-auto">🔖</button>
-                    </div>
-                    
-                    <p class="text-sm font-bold mb-3">${post.likes || 0} Me gusta</p>
-                    
-                    <h1 class="text-2xl font-bold mb-4">${post.title}</h1>
-                    <p class="text-gray-700 whitespace-pre-line">${post.content}</p>
-                </div>
-            `;
-        }
-        
-        function renderAdmin() {
-            return `
-                ${renderHeader()}
-                <div class="max-w-2xl mx-auto p-4 pb-20">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-xl font-bold">Crear Post</h2>
-                        <button onclick="logout()" class="text-red-500">Salir</button>
-                    </div>
-                    
-                    <div class="space-y-4 bg-gray-50 p-4 rounded">
-                        <input type="text" id="newTitle" placeholder="Título" class="w-full bg-white p-3 rounded border border-gray-300">
-                        <textarea id="newExcerpt" placeholder="Descripción corta" rows="2" class="w-full bg-white p-3 rounded border border-gray-300"></textarea>
-                        <textarea id="newContent" placeholder="Contenido completo" rows="6" class="w-full bg-white p-3 rounded border border-gray-300"></textarea>
-                        <input type="url" id="newImage" placeholder="URL de imagen" class="w-full bg-white p-3 rounded border border-gray-300">
-                        <button onclick="handleAddPost()" class="w-full bg-green-500 text-white p-3 rounded font-bold">Publicar</button>
-                    </div>
-                    
-                    <h3 class="text-lg font-bold mt-8 mb-4">Posts Publicados</h3>
-                    <div class="space-y-2">
-                        ${posts.map(post => `
-                            <div class="bg-gray-100 p-3 rounded flex justify-between items-center">
-                                <div>
-                                    <p class="font-bold text-sm">${post.title}</p>
-                                    <p class="text-xs text-gray-500">${post.date}</p>
-                                </div>
-                                <button onclick="deletePost(${post.id})" class="text-red-500 text-sm">Eliminar</button>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                
-                <script>
-                    function handleAddPost() {
-                        const title = document.getElementById('newTitle').value;
-                        const excerpt = document.getElementById('newExcerpt').value;
-                        const content = document.getElementById('newContent').value;
-                        const image = document.getElementById('newImage').value;
-                        
-                        if (!title || !excerpt || !content) {
-                            alert('Completa todos los campos');
-                            return;
-                        }
-                        addPost(title, excerpt, content, image);
-                        document.getElementById('newTitle').value = '';
-                        document.getElementById('newExcerpt').value = '';
-                        document.getElementById('newContent').value = '';
-                        document.getElementById('newImage').value = '';
-                    }
-                </script>
-            `;
-        }
-        
-        function render() {
-            const app = document.getElementById('app');
-            if (!isLoggedIn) {
-                app.innerHTML = renderLogin();
-            } else if (currentView === 'post') {
-                app.innerHTML = renderPostDetail();
-            } else if (currentView === 'admin') {
-                app.innerHTML = renderAdmin();
-            } else {
-                app.innerHTML = renderFeed();
-            }
-        }
-        
+    let posts = JSON.parse(localStorage.getItem('posts') || '[]');
+    let isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    let currentView = 'feed'; // 'feed', 'post', 'admin', 'login'
+    let selectedPost = null;
+    let loginAttempts = parseInt(localStorage.getItem('loginAttempts') || '0');
+    let blockedUntil = parseInt(localStorage.getItem('blockedUntil') || '0');
+    
+    function hashPassword(pwd) {
+      return CryptoJS.MD5(pwd).toString();
+    }
+    
+    function checkBlocked() {
+      if (Date.now() < blockedUntil) {
+        const minutesLeft = Math.ceil((blockedUntil - Date.now()) / 60000);
+        alert(`Acceso bloqueado. Inténtalo en ${minutesLeft} minutos.`);
+        return true;
+      }
+      return false;
+    }
+    
+    function login(password) {
+      if (checkBlocked()) return false;
+      if (hashPassword(password) === PASSWORD_HASH) {
+        isLoggedIn = true;
+        loginAttempts = 0;
+        localStorage.setItem('isLoggedIn', 'true');
+        localStorage.setItem('loginAttempts', '0');
+        currentView = 'feed';
         render();
-    </script>
+        return true;
+      }
+      loginAttempts++;
+      if (loginAttempts >= 3) {
+        blockedUntil = Date.now() + (30 * 24 * 60 * 60 * 1000);
+        localStorage.setItem('blockedUntil', blockedUntil);
+        alert('Acceso bloqueado por 30 días.');
+      }
+      localStorage.setItem('loginAttempts', loginAttempts);
+      return false;
+    }
+    
+    function logout() {
+      isLoggedIn = false;
+      currentView = 'login';
+      localStorage.setItem('isLoggedIn', 'false');
+      render();
+    }
+    
+    function addPost(title, excerpt, content, image) {
+      const post = {
+        id: Date.now(),
+        title, excerpt, content, image,
+        date: new Date().toLocaleDateString('es-ES'),
+        timestamp: Date.now(),
+        author: 'AdminUser',
+        likes: 0
+      };
+      posts.unshift(post);
+      localStorage.setItem('posts', JSON.stringify(posts));
+      alert('Post publicado!');
+      currentView = 'feed';
+      render();
+    }
+    
+    function deletePost(id) {
+      posts = posts.filter(p => p.id !== id);
+      localStorage.setItem('posts', JSON.stringify(posts));
+      render();
+    }
+    
+    function toggleLike(id) {
+      const post = posts.find(p => p.id === id);
+      if (post) {
+        post.likes = (post.likes || 0) === 0 ? 1 : 0;
+        localStorage.setItem('posts', JSON.stringify(posts));
+        render();
+      }
+    }
+    
+    function sharePost(post) {
+      const url = window.location.href;
+      const text = `${post.title} - ${post.excerpt}`;
+      if (navigator.share) {
+        navigator.share({ title: post.title, text: text, url: url });
+      } else {
+        alert('Compartir: ' + text);
+      }
+    }
+    
+    function renderLogin() {
+      return `
+        <div class="min-h-screen bg-white flex items-center justify-center px-4">
+          <div class="max-w-sm w-full">
+            <h1 class="text-3xl font-bold mb-6 text-center italic">InstaNews</h1>
+            <div class="space-y-4">
+              <input type="password" id="password" placeholder="Contraseña" class="w-full bg-gray-100 p-3 rounded border border-gray-300">
+              <button onclick="handleLogin()" class="w-full bg-blue-500 text-white p-3 rounded font-bold">Ingresar</button>
+            </div>
+          </div>
+        </div>
+        <script>
+          function handleLogin() {
+            const pwd = document.getElementById('password').value;
+            if (!login(pwd)) alert('Contraseña incorrecta');
+          }
+          document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleLogin();
+          });
+        </script>
+      `;
+    }
+    
+    function renderHeader() {
+      return `
+        <div class="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center">
+          <h1 class="text-lg font-bold italic">InstaNews</h1>
+          <button onclick="currentView = 'admin'; render()" class="text-gray-600">⚙️</button>
+        </div>
+      `;
+    }
+    
+    function renderFeed() {
+      return `
+        ${renderHeader()}
+        <div class="max-w-2xl mx-auto pb-20">
+          ${posts.map(post => `
+            <div class="border-b border-gray-200 px-4 py-4 cursor-pointer hover:bg-gray-50" onclick="selectedPost = ${post.id}; currentView = 'post'; render()">
+              <div class="flex items-center mb-3">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-yellow-500 mr-2"></div>
+                <div>
+                  <p class="font-bold text-sm">${post.author}</p>
+                </div>
+              </div>
+              ${post.image ? `<img src="${post.image}" class="w-full rounded mb-3 object-cover" style="max-height: 400px;">` : ''}
+              <div class="flex space-x-4 mb-3 text-xl">
+                <button onclick="event.stopPropagation(); toggleLike(${post.id})" class="${post.likes ? 'text-red-500' : 'text-gray-600'}">❤️</button>
+                <button onclick="event.stopPropagation(); sharePost('${post.title}')" class="text-gray-600">✈️</button>
+                <button class="text-gray-600 ml-auto">🔖</button>
+              </div>
+              <p class="text-xs text-gray-500 mb-2">${post.likes || 0} Me gusta</p>
+              <h2 class="font-bold">${post.title}</h2>
+              <p class="text-sm text-gray-600">${post.excerpt}</p>
+              <p class="text-xs text-gray-400 mt-2">HACE 2 HORAS</p>
+            </div>
+          `).join('')}
+        </div>
+        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 max-w-2xl mx-auto flex justify-around py-3">
+          <button onclick="currentView = 'feed'; render()" class="text-2xl">🏠</button>
+          <button class="text-2xl text-gray-400">❤️</button>
+          <button class="text-2xl text-gray-400">➕</button>
+          <button onclick="currentView = 'admin'; render()" class="text-2xl">👤</button>
+        </div>
+      `;
+    }
+    
+    function renderPostDetail() {
+      const post = posts.find(p => p.id === selectedPost);
+      if (!post) return renderFeed();
+      
+      return `
+        ${renderHeader()}
+        <div class="max-w-2xl mx-auto pb-20 px-4">
+          <button onclick="currentView = 'feed'; render()" class="text-blue-500 mb-4">← Volver</button>
+          
+          <div class="flex items-center mb-4">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-yellow-500 mr-3"></div>
+            <div>
+              <p class="font-bold">${post.author}</p>
+              <p class="text-xs text-gray-500">HACE 2 HORAS</p>
+            </div>
+          </div>
+          
+          ${post.image ? `<img src="${post.image}" class="w-full rounded mb-4 object-cover">` : ''}
+          
+          <div class="flex space-x-4 mb-4 text-xl">
+            <button onclick="event.stopPropagation(); toggleLike(${post.id})" class="${post.likes ? 'text-red-500' : 'text-gray-600'}">❤️</button>
+            <button onclick="sharePost('${post.title}')" class="text-gray-600">✈️</button>
+            <button class="text-gray-600 ml-auto">🔖</button>
+          </div>
+          
+          <p class="text-sm font-bold mb-3">${post.likes || 0} Me gusta</p>
+          
+          <h1 class="text-2xl font-bold mb-4">${post.title}</h1>
+          <p class="text-gray-700 whitespace-pre-line">${post.content}</p>
+        </div>
+      `;
+    }
+    
+    function renderAdmin() {
+      return `
+        ${renderHeader()}
+        <div class="max-w-2xl mx-auto p-4 pb-20">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold">Crear Post</h2>
+            <button onclick="logout()" class="text-red-500">Salir</button>
+          </div>
+          
+          <div class="space-y-4 bg-gray-50 p-4 rounded">
+            <input type="text" id="newTitle" placeholder="Título" class="w-full bg-white p-3 rounded border border-gray-300">
+            <textarea id="newExcerpt" placeholder="Descripción corta" rows="2" class="w-full bg-white p-3 rounded border border-gray-300"></textarea>
+            <textarea id="newContent" placeholder="Contenido completo" rows="4" class="w-full bg-white p-3 rounded border border-gray-300"></textarea>
+            <input type="url" id="newImage" placeholder="URL de imagen" class="w-full bg-white p-3 rounded border border-gray-300">
+            <button onclick="handleAddPost()" class="w-full bg-green-500 text-white p-3 rounded font-bold">Publicar</button>
+          </div>
+          
+          <h3 class="text-lg font-bold mt-8 mb-4">Posts Publicados</h3>
+          <div class="space-y-2">
+            ${posts.map(post => `
+              <div class="bg-gray-100 p-3 rounded flex justify-between items-center">
+                <div>
+                  <p class="font-bold">${post.title}</p>
+                  <p class="text-xs text-gray-500">${post.date}</p>
+                </div>
+                <button onclick="deletePost(${post.id})" class="text-red-500">🗑️</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <script>
+          function handleAddPost() {
+            const title = document.getElementById('newTitle').value;
+            const excerpt = document.getElementById('newExcerpt').value;
+            const content = document.getElementById('newContent').value;
+            const image = document.getElementById('newImage').value;
+            
+            if (!title || !excerpt || !content) {
+              alert('Completa todos los campos');
+              return;
+            }
+            addPost(title, excerpt, content, image);
+            document.getElementById('newTitle').value = '';
+            document.getElementById('newExcerpt').value = '';
+            document.getElementById('newContent').value = '';
+            document.getElementById('newImage').value = '';
+          }
+        </script>
+      `;
+    }
+    
+    function render() {
+      const app = document.getElementById('app');
+      if (!isLoggedIn) {
+        app.innerHTML = renderLogin();
+      } else if (currentView === 'post') {
+        app.innerHTML = renderPostDetail();
+      } else if (currentView === 'admin') {
+        app.innerHTML = renderAdmin();
+      } else {
+        app.innerHTML = renderFeed();
+      }
+    }
+    
+    render();
+  </script>
 </body>
 </html>
